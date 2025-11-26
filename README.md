@@ -126,3 +126,5 @@ Give it a **star on GitHub** and share it with others learning C!
 ---
 
 **Made with ❤️ using C Language**
+<img width="570" height="474" alt="image" src="https://github.com/user-attachments/assets/82089ac1-6d24-4a65-a3af-08a93ca918f7" />
+

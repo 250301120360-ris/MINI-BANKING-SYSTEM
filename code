@@ -1,0 +1,312 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct Account {
+    int account_no;
+    char name[50];
+    float balance;
+    char password[20];
+};
+
+const char *FILE_NAME = "bank_records.dat";
+
+void createAccount();
+void deleteAccount();
+void deposit();
+void withdraw();
+void transferMoney();
+void checkBalance();
+void listAccounts();
+int login(int acc_no, char *pass);
+
+int main() {
+    int choice;
+
+    while (1) {
+        printf("
+===== MINI BANKING SYSTEM =====
+");
+        printf("1. Create Account
+");
+        printf("2. Delete Account
+");
+        printf("3. Deposit Money
+");
+        printf("4. Withdraw Money
+");
+        printf("5. Transfer Money
+");
+        printf("6. Check Balance
+");
+        printf("7. List All Accounts
+");
+        printf("8. Exit
+");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1: createAccount(); break;
+            case 2: deleteAccount(); break;
+            case 3: deposit(); break;
+            case 4: withdraw(); break;
+            case 5: transferMoney(); break;
+            case 6: checkBalance(); break;
+            case 7: listAccounts(); break;
+            case 8: exit(0);
+            default: printf("Invalid choice! Try again.
+");
+        }
+    }
+}
+
+int login(int acc_no, char *pass) {
+    FILE *fp = fopen(FILE_NAME, "rb");
+    struct Account acc;
+
+    while (fread(&acc, sizeof(acc), 1, fp)) {
+        if (acc.account_no == acc_no && strcmp(pass, acc.password) == 0) {
+            fclose(fp);
+            return 1;
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+
+void createAccount() {
+    FILE *fp = fopen(FILE_NAME, "ab");
+    struct Account acc;
+
+    printf("Enter Account Number: ");
+    scanf("%d", &acc.account_no);
+    printf("Enter Name: ");
+    scanf("%s", acc.name);
+    printf("Set Password: ");
+    scanf("%s", acc.password);
+    printf("Enter Initial Deposit: ");
+    scanf("%f", &acc.balance);
+
+    fwrite(&acc, sizeof(acc), 1, fp);
+    fclose(fp);
+
+    printf("Account Created Successfully!
+");
+}
+
+void deleteAccount() {
+    FILE *fp = fopen(FILE_NAME, "rb");
+    FILE *temp = fopen("temp.dat", "wb");
+    struct Account acc;
+    int acc_no;
+    char pass[20];
+
+    printf("Enter Account Number to Delete: ");
+    scanf("%d", &acc_no);
+    printf("Enter Password: ");
+    scanf("%s", pass);
+
+    if (!login(acc_no, pass)) {
+        printf("Incorrect account number or password!
+");
+        fclose(fp);
+        fclose(temp);
+        return;
+    }
+
+    while (fread(&acc, sizeof(acc), 1, fp)) {
+        if (acc.account_no != acc_no) {
+            fwrite(&acc, sizeof(acc), 1, temp);
+        }
+    }
+
+    fclose(fp);
+    fclose(temp);
+    remove(FILE_NAME);
+    rename("temp.dat", FILE_NAME);
+
+    printf("Account Deleted Successfully!
+");
+}
+
+void deposit() {
+    FILE *fp = fopen(FILE_NAME, "rb+");
+    int acc_no;
+    char pass[20];
+    float amt;
+    struct Account acc;
+
+    printf("Enter Account Number: ");
+    scanf("%d", &acc_no);
+    printf("Enter Password: ");
+    scanf("%s", pass);
+
+    if (!login(acc_no, pass)) {
+        printf("Incorrect login!
+"); return;
+    }
+
+    while (fread(&acc, sizeof(acc), 1, fp)) {
+        if (acc.account_no == acc_no) {
+            printf("Enter Amount to Deposit: ");
+            scanf("%f", &amt);
+            acc.balance += amt;
+
+            fseek(fp, -sizeof(acc), SEEK_CUR);
+            fwrite(&acc, sizeof(acc), 1, fp);
+
+            printf("Deposit Successful! New Balance: %.2f
+", acc.balance);
+            fclose(fp);
+            return;
+        }
+    }
+
+    fclose(fp);
+}
+
+void withdraw() {
+    FILE *fp = fopen(FILE_NAME, "rb+");
+    int acc_no;
+    char pass[20];
+    float amt;
+    struct Account acc;
+
+    printf("Enter Account Number: ");
+    scanf("%d", &acc_no);
+    printf("Enter Password: ");
+    scanf("%s", pass);
+
+    if (!login(acc_no, pass)) {
+        printf("Incorrect login!
+"); return;
+    }
+
+    while (fread(&acc, sizeof(acc), 1, fp)) {
+        if (acc.account_no == acc_no) {
+            printf("Enter Amount to Withdraw: ");
+            scanf("%f", &amt);
+
+            if (amt > acc.balance) {
+                printf("Insufficient Balance!
+");
+            } else {
+                acc.balance -= amt;
+                fseek(fp, -sizeof(acc), SEEK_CUR);
+                fwrite(&acc, sizeof(acc), 1, fp);
+                printf("Withdrawal Successful! New Balance: %.2f
+", acc.balance);
+            }
+
+            fclose(fp);
+            return;
+        }
+    }
+
+    fclose(fp);
+}
+
+void transferMoney() {
+    FILE *fp = fopen(FILE_NAME, "rb+");
+    int from_acc, to_acc;
+    char pass[20];
+    float amt;
+    struct Account acc_from, acc_to;
+    long pos_from = -1, pos_to = -1;
+
+    printf("Enter Your Account Number: ");
+    scanf("%d", &from_acc);
+    printf("Enter Password: ");
+    scanf("%s", pass);
+
+    if (!login(from_acc, pass)) {
+        printf("Incorrect login!
+"); return;
+    }
+
+    printf("Enter Receiver Account Number: ");
+    scanf("%d", &to_acc);
+
+    while (fread(&acc_from, sizeof(acc_from), 1, fp)) {
+        if (acc_from.account_no == from_acc) {
+            pos_from = ftell(fp) - sizeof(acc_from);
+        }
+        if (acc_from.account_no == to_acc) {
+            acc_to = acc_from;
+            pos_to = ftell(fp) - sizeof(acc_from);
+        }
+    }
+
+    if (pos_from == -1 || pos_to == -1) {
+        printf("One or both accounts not found!
+");
+        fclose(fp);
+        return;
+    }
+
+    printf("Enter Amount to Transfer: ");
+    scanf("%f", &amt);
+
+    if (amt > acc_from.balance) {
+        printf("Insufficient Balance!
+");
+        fclose(fp);
+        return;
+    }
+
+    acc_from.balance -= amt;
+    acc_to.balance += amt;
+
+    fseek(fp, pos_from, SEEK_SET);
+    fwrite(&acc_from, sizeof(acc_from), 1, fp);
+
+    fseek(fp, pos_to, SEEK_SET);
+    fwrite(&acc_to, sizeof(acc_to), 1, fp);
+
+    fclose(fp);
+    printf("Transfer Successful!
+");
+}
+
+void checkBalance() {
+    FILE *fp = fopen(FILE_NAME, "rb");
+    int acc_no;
+    char pass[20];
+    struct Account acc;
+
+    printf("Enter Account Number: ");
+    scanf("%d", &acc_no);
+    printf("Enter Password: ");
+    scanf("%s", pass);
+
+    if (!login(acc_no, pass)) {
+        printf("Incorrect login!
+"); return;
+    }
+
+    while (fread(&acc, sizeof(acc), 1, fp)) {
+        if (acc.account_no == acc_no) {
+            printf("Name: %s | Balance: %.2f
+", acc.name, acc.balance);
+            fclose(fp);
+            return;
+        }
+    }
+
+    fclose(fp);
+}
+
+void listAccounts() {
+    FILE *fp = fopen(FILE_NAME, "rb");
+    struct Account acc;
+
+    printf("
+===== ALL ACCOUNTS =====
+");
+    while (fread(&acc, sizeof(acc), 1, fp)) {
+        printf("Acc No: %d | Name: %s | Balance: %.2f
+", acc.account_no, acc.name, acc.balance);
+    }
+    fclose(fp);
+}
